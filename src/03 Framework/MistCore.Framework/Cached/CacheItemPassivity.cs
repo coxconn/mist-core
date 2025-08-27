@@ -5,13 +5,17 @@ using System.Data;
 using System.Linq;
 using System.Threading;
 
-namespace MistCore.Framework.Cache
+namespace MistCore.Framework.Cached
 {
-    internal class CacheItemLong<T>
+    internal class CacheItemPassivity<T>
     {
-        public DateTime? SilpExpireTime { get; set; }
+        public DateTime LastTime { get; set; }
+
+        public int? SlidingMillisecond { get; set; }
 
         public DateTime? AbsExpireTime { get; set; }
+
+        public bool IsExpire { get; set; }
 
         public T Item { get; set; }
     }
