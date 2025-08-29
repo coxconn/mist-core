@@ -42,8 +42,8 @@ namespace MistCore.Framework.EService
                 q1.From(0).Take(0);
             }
 
-            //if (!string.IsNullOrEmpty(page.Order))
-            //{
+            if (!string.IsNullOrEmpty(page.Order))
+            {
                 var orders = page.Order
                     .Split(',', StringSplitOptions.RemoveEmptyEntries)
                     .Select(c => c.Split(' ', StringSplitOptions.RemoveEmptyEntries))
@@ -67,7 +67,7 @@ namespace MistCore.Framework.EService
                 {
                     q1.Sort(st => sortDescriptor);
                 }
-            //}
+            }
             //else if (!string.IsNullOrEmpty(page.Sort))
             //{
             //    if (page.isDesc)
