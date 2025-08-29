@@ -50,8 +50,8 @@ namespace MistCore.Framework.Cached.RedisProvider
 
             var connectionMultiplexer = ConnectionMultiplexer.Connect(configOptions);
             //connectionMultiplexer.PreserveAsyncOrder = false; //Œﬁ–Ú÷¥––
-            services.AddScoped<IDatabase>(service => connectionMultiplexer.GetDatabase());
-            services.AddScoped(typeof(RedisClient));
+            services.AddSingleton<IDatabase>(service => connectionMultiplexer.GetDatabase());
+            services.AddSingleton(typeof(RedisClient));
             #endregion
         }
 
