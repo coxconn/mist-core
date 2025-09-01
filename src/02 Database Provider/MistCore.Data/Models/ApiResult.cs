@@ -58,11 +58,17 @@ namespace MistCore.Data
     [Serializable]
     public class ResultInfo<T>
     {
+        public virtual T detail { get; set; }
         public virtual List<T> List { get; set; }
         public PageInfo Page { get; set; }
 
         public ResultInfo()
         {
+        }
+
+        public ResultInfo(T detail)
+        {
+            this.detail = detail;
         }
 
         public ResultInfo(List<T> list, PageInfo page)
