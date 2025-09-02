@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
 	<TargetFramework>netstandard2.1</TargetFramework>
@@ -7,7 +7,7 @@
     <Description>Mist framework</Description>
 	<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<PackageIcon>nuget-logo.png</PackageIcon>
-	<Version>1.0.1</Version>
+	<Version>1.0.2</Version>
 	<Authors>John Hsu</Authors>
   </PropertyGroup>
 

@@ -14,13 +14,6 @@ namespace MistCore.Framework.Cached.RedisProvider
     /// </summary>
     public partial class RedisClient
     {
-        private IDatabase database;
-
-        public RedisClient(IDatabase database)
-        {
-            this.database = database;
-        }
-
         #region 键命令
 
         /// <summary>
@@ -29,15 +22,15 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// </summary>
         /// <param name="keys"></param>
         /// <returns></returns>
-        public long DEL(params string[] keys)
+        public async Task<long> DELAsync(params string[] keys)
         {
             if (keys.Length > 1)
             {
-                return this.database.KeyDelete(keys.Select(c => (RedisKey)c).ToArray());
+                return await this.database.KeyDeleteAsync(keys.Select(c => (RedisKey)c).ToArray());
             }
             else if (keys.Length == 1)
             {
-                return this.database.KeyDelete(keys[0]) ? 1 : 0;
+                return await this.database.KeyDeleteAsync(keys[0]) ? 1 : 0;
             }
             else
             {
@@ -51,15 +44,15 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// </summary>
         /// <param name="keys"></param>
         /// <returns></returns>
-        public long EXISTS(params string[] keys)
+        public async Task<long> EXISTSAsync(params string[] keys)
         {
             if (keys.Length > 1)
             {
-                return this.database.KeyExists(keys.Select(c => (RedisKey)c).ToArray());
+                return await this.database.KeyExistsAsync(keys.Select(c => (RedisKey)c).ToArray());
             }
             else if (keys.Length == 1)
             {
-                return this.database.KeyExists(keys[0]) ? 1 : 0;
+                return await this.database.KeyExistsAsync(keys[0]) ? 1 : 0;
             }
             else
             {
@@ -74,9 +67,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="seconds"></param>
         /// <returns></returns>
-        public bool EXPIRE(string key, int seconds)
+        public async Task<bool> EXPIREAsync(string key, int seconds)
         {
-            return this.database.KeyExpire(key, TimeSpan.FromSeconds(seconds));
+            return await this.database.KeyExpireAsync(key, TimeSpan.FromSeconds(seconds));
         }
 
         /// <summary>
@@ -86,9 +79,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="milliseconds"></param>
         /// <returns></returns>
-        public bool PEXPIRE(string key, int milliseconds)
+        public async Task<bool> PEXPIREAsync(string key, int milliseconds)
         {
-            return this.database.KeyExpire(key, TimeSpan.FromMilliseconds(milliseconds));
+            return await this.database.KeyExpireAsync(key, TimeSpan.FromMilliseconds(milliseconds));
         }
 
         /// <summary>
@@ -98,9 +91,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="dateTime"></param>
         /// <returns></returns>
-        public bool EXPIREAT(string key, DateTime dateTime)
+        public async Task<bool> EXPIREATAsync(string key, DateTime dateTime)
         {
-            return this.database.KeyExpire(key, dateTime);
+            return await this.database.KeyExpireAsync(key, dateTime);
         }
 
         /// <summary>
@@ -110,9 +103,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="millisecondsTimestamp"></param>
         /// <returns></returns>
-        public bool PEXPIREAT(string key, long millisecondsTimestamp)
+        public async Task<bool> PEXPIREATAsync(string key, long millisecondsTimestamp)
         {
-            return this.database.KeyExpire(key, new DateTime(1970, 1, 1).AddMilliseconds(millisecondsTimestamp));
+            return await this.database.KeyExpireAsync(key, new DateTime(1970, 1, 1).AddMilliseconds(millisecondsTimestamp));
         }
 
         /// <summary>
@@ -121,9 +114,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public bool PERSIST(string key)
+        public async Task<bool> PERSISTAsync(string key)
         {
-            return this.database.KeyPersist(key);
+            return await this.database.KeyPersistAsync(key);
         }
 
         /// <summary>
@@ -132,44 +125,44 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public double? TTL(string key)
+        public async Task<double?> TTLAsync(string key)
         {
-            return this.database.KeyTimeToLive(key)?.TotalSeconds;
+            return (await this.database.KeyTimeToLiveAsync(key))?.TotalSeconds;
         }
 
         #endregion
 
         #region 事务
 
-        public void MULTI(Action<ITransaction> func)
+        public async Task MULTIAsync(Action<ITransaction> func)
         {
             var transaction = this.database.CreateTransaction(); //multi
 
             func(transaction);
 
-            transaction.Execute();
+            await transaction.ExecuteAsync();
         }
 
         #endregion
 
         #region STRIGN
 
-        public bool SET(string key, object value, TimeSpan? timeSpan = null)
+        public async Task<bool> SETAsync(string key, object value, TimeSpan? timeSpan = null)
         {
             var json = JsonConvert.SerializeObject(value);
             if (timeSpan == null)
             {
-                return this.database.StringSet(key, json);
+                return await this.database.StringSetAsync(key, json);
             }
             else
             {
-                return this.database.StringSet(key, json, timeSpan);
+                return await this.database.StringSetAsync(key, json, timeSpan);
             }
         }
 
-        public T GET<T>(string key)
+        public async Task<T> GETAsync<T>(string key)
         {
-            var value = this.database.StringGet(key);
+            var value = await this.database.StringGetAsync(key);
             if (!value.HasValue)
             {
                 return default(T);
@@ -177,9 +170,9 @@ namespace MistCore.Framework.Cached.RedisProvider
             return JsonConvert.DeserializeObject<T>(Convert.ToString(value));
         }
 
-        public T GETRANGE<T>(string key, long start, long end) where T : class
+        public async Task<T> GETRANGEAsync<T>(string key, long start, long end) where T : class
         {
-            var value = this.database.StringGetRange(key, start, end);
+            var value = await this.database.StringGetRangeAsync(key, start, end);
             if (!value.HasValue)
             {
                 return default(T);
@@ -187,9 +180,9 @@ namespace MistCore.Framework.Cached.RedisProvider
             return JsonConvert.DeserializeObject<T>(value);
         }
 
-        public T GETSET<T>(string key, RedisValue value) where T : class
+        public async Task<T> GETSETAsync<T>(string key, RedisValue value) where T : class
         {
-            var value1 = this.database.StringGetSet(key, value);
+            var value1 = await this.database.StringGetSetAsync(key, value);
             if (!value1.HasValue)
             {
                 return default(T);
@@ -197,9 +190,9 @@ namespace MistCore.Framework.Cached.RedisProvider
             return JsonConvert.DeserializeObject<T>(value1);
         }
 
-        public IEnumerable<T> MGET<T>(params string[] keys) where T : class
+        public async IAsyncEnumerable<T> MGETAsync<T>(params string[] keys) where T : class
         {
-            foreach (var item in this.database.StringGet(keys.Select(c => (RedisKey)c).ToArray()))
+            foreach (var item in await this.database.StringGetAsync(keys.Select(c => (RedisKey)c).ToArray()))
             {
                 yield return item as T;
             }
@@ -212,9 +205,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <param name="seconds"></param>
-        public bool SETEX(string key, RedisValue value, int seconds)
+        public async Task<bool> SETEXAsync(string key, RedisValue value, int seconds)
         {
-            return this.database.StringSet(key, value, TimeSpan.FromSeconds(seconds));
+            return await this.database.StringSetAsync(key, value, TimeSpan.FromSeconds(seconds));
         }
 
         /// <summary>
@@ -224,9 +217,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="values"></param>
         /// <param name="when"></param>
         /// <returns></returns>
-        public bool MSET(KeyValuePair<string, RedisValue>[] values, When when = When.Always)
+        public async Task<bool> MSETAsync(KeyValuePair<string, RedisValue>[] values, When when = When.Always)
         {
-            return this.database.StringSet(values.Select(c => new KeyValuePair<RedisKey, RedisValue>(c.Key, c.Value)).ToArray(), when);
+            return await this.database.StringSetAsync(values.Select(c => new KeyValuePair<RedisKey, RedisValue>(c.Key, c.Value)).ToArray(), when);
         }
         #endregion
 
@@ -238,15 +231,15 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="value"></param>
         /// <returns></returns>
-        public long SADD(string key, params RedisValue[] members)
+        public async Task<long> SADDAsync(string key, params RedisValue[] members)
         {
             if (members.Length > 1)
             {
-                return this.database.SetAdd(key, members.Select(c => c).ToArray());
+                return await this.database.SetAddAsync(key, members.Select(c => c).ToArray());
             }
             else if (members.Length == 1)
             {
-                return this.database.SetAdd(key, members[0]) ? 1 : 0;
+                return await this.database.SetAddAsync(key, members[0]) ? 1 : 0;
             }
             else
             {
@@ -260,9 +253,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        public long SCARD(string key)
+        public async Task<long> SCARDAsync(string key)
         {
-            return this.database.SetLength(key);
+            return await this.database.SetLengthAsync(key);
         }
 
         /// <summary>
@@ -272,9 +265,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="member"></param>
         /// <returns></returns>
-        public bool SISMEMBER(string key, string member)
+        public async Task<bool> SISMEMBERAsync(string key, string member)
         {
-            return this.database.SetContains(key, member);
+            return await this.database.SetContainsAsync(key, member);
         }
 
         /// <summary>
@@ -284,9 +277,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <typeparam name="T"></typeparam>
         /// <param name="key"></param>
         /// <returns></returns>
-        public List<T> SMEMBERS<T>(string key) where T : class
+        public async Task<List<T>> SMEMBERSAsync<T>(string key) where T : class
         {
-            var result = this.database.SetMembers(key);
+            var result = await this.database.SetMembersAsync(key);
             if (typeof(T) == typeof(string))
             {
                 return result.ToStringArray().OfType<T>().ToList();
@@ -301,15 +294,15 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="members"></param>
         /// <returns></returns>
-        public long SREM(string key, params RedisValue[] members)
+        public async Task<long> SREMAsync(string key, params RedisValue[] members)
         {
             if (members.Length > 1)
             {
-                return this.database.SetRemove(key, members);
+                return await this.database.SetRemoveAsync(key, members);
             }
             else if (members.Length == 1)
             {
-                return this.database.SetRemove(key, members[0]) ? 1 : 0;
+                return await this.database.SetRemoveAsync(key, members[0]) ? 1 : 0;
             }
             else
             {
@@ -328,9 +321,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="pageOffset"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        public IEnumerable<T> SSCAN<T>(string key, int cursor = 0, RedisValue pattern = default, int pageSize = 10, int pageOffset = 0) where T : class
+        public async IAsyncEnumerable<T> SSCANAsync<T>(string key, int cursor = 0, RedisValue pattern = default, int pageSize = 10, int pageOffset = 0) where T : class
         {
-            foreach (var item in this.database.SetScan(key, pattern, pageSize, cursor, pageOffset))
+            await foreach (var item in this.database.SetScanAsync(key, pattern, pageSize, cursor, pageOffset))
             {
                 yield return item as T;
             }
@@ -343,9 +336,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="operation"></param>
         /// <param name="keys"></param>
         /// <returns></returns>
-        public List<T> SetCombine<T>(SetOperation operation, params string[] keys) where T : class
+        public async Task<List<T>> SetCombineAsync<T>(SetOperation operation, params string[] keys) where T : class
         {
-            return this.database.SetCombine(operation, keys.Select(c => (RedisKey)c).ToArray()).Select(c => c as T).ToList();
+            return (await this.database.SetCombineAsync(operation, keys.Select(c => (RedisKey)c).ToArray())).Select(c => c as T).ToList();
         }
 
         /// <summary>
@@ -356,9 +349,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="first"></param>
         /// <param name="second"></param>
         /// <returns></returns>
-        public long SetCombineAndStore(SetOperation operation, string destination, string first, string second)
+        public async Task<long> SetCombineAndStoreAsync(SetOperation operation, string destination, string first, string second)
         {
-            return this.database.SetCombineAndStore(operation, destination, first, second);
+            return await this.database.SetCombineAndStoreAsync(operation, destination, first, second);
         }
         #endregion
 
