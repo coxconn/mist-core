@@ -147,7 +147,7 @@ namespace MistCore.Framework.EService
                 }
                 foreach (var highlights in c.Highlights)
                 {
-                    var field = fields.Where(l => highlights.Value.Field == l.Name).FirstOrDefault();
+                    var field = fields.Where(l => highlights.Value.Field.Equals(l.Name, StringComparison.OrdinalIgnoreCase) || highlights.Value.Field.StartsWith(l.Name + ".", StringComparison.OrdinalIgnoreCase)).FirstOrDefault();
                     if (field == null)
                     {
                         continue;
