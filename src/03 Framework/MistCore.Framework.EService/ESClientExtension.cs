@@ -269,18 +269,19 @@ namespace MistCore.Framework.EService
 
                 foreach (var key in keys)
                 {
-                    qc |= q2.TermRange(f => f.Field(st.Field).Boost(st.Boost).Name(st.Name).Strict(st.IsStrict).Verbatim(st.IsVerbatim).Range(key, st.Split));
+                    qc |= q2.TermRange(f => f.Field(st.Field).Boost(st.Boost).Name(st.Name).Strict(st.IsStrict).Verbatim(st.IsVerbatim).Range(key, st.Split, st.IntervalType));
                 }
                 q2.Bool(c => c.Should(f => qc));
                 return qc;
             }
 
-            return q2.TermRange(f => f.Field(st.Field).Boost(st.Boost).Name(st.Name).Strict(st.IsStrict).Verbatim(st.IsVerbatim).Range(st.Ranges, st.Split));
+            return q2.TermRange(f => f.Field(st.Field).Boost(st.Boost).Name(st.Name).Strict(st.IsStrict).Verbatim(st.IsVerbatim).Range(st.Ranges, st.Split, st.IntervalType));
         }
         public interface ITermRangeSplitQuery : IRangeQuery, IFieldNameQuery, IQuery
         {
             string Ranges { get; set; }
             string Split { get; set; }
+            IntervalType IntervalType { get; set; }
         }
         [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
         public class TermRangeSplitQueryDescriptor<T> : FieldNameQueryDescriptorBase<TermRangeSplitQueryDescriptor<T>, ITermRangeSplitQuery, T>, ITermRangeSplitQuery, IRangeQuery, IFieldNameQuery, IQuery where T : class
@@ -289,6 +290,7 @@ namespace MistCore.Framework.EService
             protected override bool Conditionless { get; }
             public string Ranges { get; set; }
             public string Split { get; set; }
+            public IntervalType IntervalType { get; set; }
 
             /// <summary>
             /// 数值范围取词
@@ -300,11 +302,13 @@ namespace MistCore.Framework.EService
             /// <param name="q1"></param>
             /// <param name="value"></param>
             /// <param name="split">分割符 默认：-</param>
+            /// <param name="intervalType">取值范围 默认：LeftClosedRightOpen (左闭右开 [a, b))</param>
             /// <returns></returns>
-            public TermRangeSplitQueryDescriptor<T> Range(string value, string split = "-")
+            public TermRangeSplitQueryDescriptor<T> Range(string value, string split = "-", IntervalType intervalType = IntervalType.LeftClosedRightOpen)
             {
                 this.Ranges = value;
                 this.Split = split;
+                this.IntervalType = intervalType;
                 return this;
             }
         }
@@ -337,18 +341,20 @@ namespace MistCore.Framework.EService
 
                 foreach (var key in keys)
                 {
-                    qc |= q2.DateRange(f => f.Field(st.Field).Boost(st.Boost).Name(st.Name).Strict(st.IsStrict).Verbatim(st.IsVerbatim).Range(key, st.Split));
+                    qc |= q2.DateRange(f => f.Field(st.Field).Boost(st.Boost).Name(st.Name).Strict(st.IsStrict).Verbatim(st.IsVerbatim).Range(key, st.Split, st.Format, st.IntervalType));
                 }
                 q2.Bool(c => c.Should(f => qc));
                 return qc;
             }
 
-            return q2.DateRange(f => f.Field(st.Field).Boost(st.Boost).Name(st.Name).Strict(st.IsStrict).Verbatim(st.IsVerbatim).Range(st.Ranges, st.Split));
+            return q2.DateRange(f => f.Field(st.Field).Boost(st.Boost).Name(st.Name).Strict(st.IsStrict).Verbatim(st.IsVerbatim).Range(st.Ranges, st.Split, st.Format, st.IntervalType));
         }
         public interface IDateRangeSplitQuery : IRangeQuery, IFieldNameQuery, IQuery
         {
             string Ranges { get; set; }
             string Split { get; set; }
+            string Format { get; set; }
+            IntervalType IntervalType { get; set; }
         }
         [JsonObject(MemberSerialization = MemberSerialization.OptIn)]
         public class DateRangeSplitQueryDescriptor<T> : FieldNameQueryDescriptorBase<DateRangeSplitQueryDescriptor<T>, IDateRangeSplitQuery, T>, IDateRangeSplitQuery, IRangeQuery, IFieldNameQuery, IQuery where T : class
@@ -356,6 +362,8 @@ namespace MistCore.Framework.EService
             protected override bool Conditionless { get; }
             public string Ranges { get; set; }
             public string Split { get; set; }
+            public string Format { get; set; }
+            public IntervalType IntervalType { get; set; }
 
             /// <summary>
             /// 时间范围取词
@@ -369,11 +377,14 @@ namespace MistCore.Framework.EService
             /// <param name="value"></param>
             /// <param name="split">分割符 默认：-</param>
             /// <param name="format">日期格式 默认：yyyyMMddHHmmss</param>
+            /// <param name="intervalType">取值范围 默认：LeftClosedRightOpen (左闭右开 [a, b))</param>
             /// <returns></returns>
-            public DateRangeSplitQueryDescriptor<T> Range(string value, string split = "-")
+            public DateRangeSplitQueryDescriptor<T> Range(string value, string split = "-", string format = "yyyyMMddHHmmss", IntervalType intervalType = IntervalType.LeftClosedRightOpen)
             {
                 this.Ranges = value;
                 this.Split = split;
+                this.Format = format;
+                this.IntervalType = intervalType;
                 return this;
             }
         }
@@ -392,8 +403,9 @@ namespace MistCore.Framework.EService
         /// <param name="value"></param>
         /// <param name="split">分割符 默认：-</param>
         /// <param name="format">日期格式 默认：yyyyMMddHHmmss</param>
+        /// <param name="intervalType">取值范围 默认：LeftClosedRightOpen 左闭右开 [a, b)</param>
         /// <returns></returns>
-        public static DateRangeQueryDescriptor<T> Range<T>(this DateRangeQueryDescriptor<T> q1, string value, string split = "-", string format = "yyyyMMddHHmmss") where T : class
+        public static DateRangeQueryDescriptor<T> Range<T>(this DateRangeQueryDescriptor<T> q1, string value, string split = "-", string format = "yyyyMMddHHmmss", IntervalType intervalType = IntervalType.LeftClosedRightOpen) where T : class
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -439,11 +451,43 @@ namespace MistCore.Framework.EService
 
             if (nf.Max(c => (int?)c?.Length) >= 4)
             {
-                return q1.GreaterThanOrEquals(dts[0]).LessThan(dts[1]).Format("yyyy-MM-dd HH:mm:ss");
+                if (intervalType == IntervalType.Closed)
+                {
+                    return q1.GreaterThanOrEquals(dts[0]).LessThanOrEquals(dts[1]).Format("yyyy-MM-dd HH:mm:ss");
+                }
+                else if (intervalType == IntervalType.LeftClosedRightOpen)
+                {
+                    return q1.GreaterThanOrEquals(dts[0]).LessThan(dts[1]).Format("yyyy-MM-dd HH:mm:ss");
+                }
+                else if (intervalType == IntervalType.LeftOpenRightClosed)
+                {
+                    return q1.GreaterThan(dts[0]).LessThanOrEquals(dts[1]).Format("yyyy-MM-dd HH:mm:ss");
+                }
+                else
+                {
+                    return q1.GreaterThan(dts[0]).LessThan(dts[1]).Format("yyyy-MM-dd HH:mm:ss");
+                }
+                //return q1.GreaterThanOrEquals(dts[0]).LessThan(dts[1]).Format("yyyy-MM-dd HH:mm:ss");
             }
             else
             {
-                return q1.GreaterThanOrEquals(dts[1]).LessThan(dts[0]).Format("yyyy-MM-dd HH:mm:ss");
+                if (intervalType == IntervalType.Closed)
+                {
+                    return q1.GreaterThanOrEquals(dts[1]).LessThanOrEquals(dts[0]).Format("yyyy-MM-dd HH:mm:ss");
+                }
+                else if (intervalType == IntervalType.LeftClosedRightOpen)
+                {
+                    return q1.GreaterThanOrEquals(dts[1]).LessThan(dts[0]).Format("yyyy-MM-dd HH:mm:ss");
+                }
+                else if (intervalType == IntervalType.LeftOpenRightClosed)
+                {
+                    return q1.GreaterThan(dts[1]).LessThanOrEquals(dts[0]).Format("yyyy-MM-dd HH:mm:ss");
+                }
+                else
+                {
+                    return q1.GreaterThan(dts[1]).LessThan(dts[0]).Format("yyyy-MM-dd HH:mm:ss");
+                }
+                //return q1.GreaterThanOrEquals(dts[1]).LessThan(dts[0]).Format("yyyy-MM-dd HH:mm:ss");
             }
         }
 
@@ -460,8 +504,9 @@ namespace MistCore.Framework.EService
         /// <param name="q1"></param>
         /// <param name="value"></param>
         /// <param name="split">分割符 默认：-</param>
+        /// <param name="intervalType">取值范围 默认：LeftClosedRightOpen 左闭右开 [a, b)</param>
         /// <returns></returns>
-        public static TermRangeQueryDescriptor<T> Range<T>(this TermRangeQueryDescriptor<T> q1, string value, string split = "-") where T : class
+        public static TermRangeQueryDescriptor<T> Range<T>(this TermRangeQueryDescriptor<T> q1, string value, string split = "-", IntervalType intervalType = IntervalType.LeftClosedRightOpen) where T : class
         {
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -481,7 +526,23 @@ namespace MistCore.Framework.EService
                 return int.TryParse(c, out it) ? it.ToString() : null;
             }).ToArray();
 
-            return q1.GreaterThanOrEquals(dts[0]).LessThan(dts[1]);
+            if (intervalType == IntervalType.Closed)
+            {
+                return q1.GreaterThanOrEquals(dts[0]).LessThanOrEquals(dts[1]);
+            }
+            else if (intervalType == IntervalType.LeftClosedRightOpen)
+            {
+                return q1.GreaterThanOrEquals(dts[0]).LessThan(dts[1]);
+            }
+            else if (intervalType == IntervalType.LeftOpenRightClosed)
+            {
+                return q1.GreaterThan(dts[0]).LessThanOrEquals(dts[1]);
+            }
+            else
+            {
+                return q1.GreaterThan(dts[0]).LessThan(dts[1]);
+            }
+            //return q1.GreaterThanOrEquals(dts[0]).LessThan(dts[1]);
         }
 
         /// <summary>
