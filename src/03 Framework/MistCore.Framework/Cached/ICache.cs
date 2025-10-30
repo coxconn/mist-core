@@ -52,9 +52,9 @@ namespace MistCore.Framework.Cached
         /// <typeparam name="T"></typeparam>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        /// <param name="slidingMillisecond"></param>
-        /// <param name="absoluteTime"></param>
-        void Set<T>(string key, T value, int? slidingMillisecond = null, DateTime? absoluteTime = null);
+        /// <param name="slidingTimeSpan"></param>
+        /// <param name="absoluteTimeSpan"></param>
+        void Set<T>(string key, T value, TimeSpan? slidingTimeSpan = null, TimeSpan? absoluteTimeSpan = null);
 
         /// <summary>
         /// GetOrAdd
@@ -62,9 +62,9 @@ namespace MistCore.Framework.Cached
         /// <typeparam name="T"></typeparam>
         /// <param name="key"></param>
         /// <param name="func"></param>
-        /// <param name="slidingMillisecond"></param>
-        /// <param name="absoluteTime"></param>
-        T GetOrAdd<T>(string key, Func<string, T> func, int? slidingMillisecond = null, DateTime? absoluteTime = null);
+        /// <param name="slidingTimeSpan"></param>
+        /// <param name="absoluteTimeSpan"></param>
+        T GetOrAdd<T>(string key, Func<string, T> func, TimeSpan? slidingTimeSpan = null, TimeSpan? absoluteTimeSpan = null);
 
     }
 }

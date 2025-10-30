@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -14,9 +15,15 @@ namespace MistCore.Framework.Cached
     /// </summary>
     public class LocalCachePassivity: ICache
     {
+        private readonly ILogger<LocalCachePassivity> logger;
         private readonly static ConcurrentDictionary<string, Lazy<CacheItemPassivity<object>>> ipools = new ConcurrentDictionary<string, Lazy<CacheItemPassivity<object>>>();
 
         public static int Count { get { return ipools.Count; } }
+
+        public LocalCachePassivity(ILogger<LocalCachePassivity> logger)
+        {
+            this.logger = logger;
+        }
 
         public string Get(string key)
         {
@@ -49,7 +56,7 @@ namespace MistCore.Framework.Cached
             Lazy<CacheItemPassivity<object>> value;
             if (ipools.TryGetValue(key, out value))
             {
-                value.Value.LastTime = DateTime.Now;
+                value.Value.LastQueryTime = DateTime.Now;
             }
         }
 
@@ -59,9 +66,9 @@ namespace MistCore.Framework.Cached
         /// <typeparam name="T"></typeparam>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        /// <param name="slidingMillisecond"></param>
-        /// <param name="absoluteTime"></param>
-        public void Set<T>(string key, T value, int? slidingMillisecond = null, DateTime? absoluteTime = null)
+        /// <param name="slidingTimeSpan"></param>
+        /// <param name="absoluteTimeSpan"></param>
+        public void Set<T>(string key, T value, TimeSpan? slidingTimeSpan = null, TimeSpan? absoluteTimeSpan = null)
         {
             var item = ipools.AddOrUpdate(key,
                 key => new Lazy<CacheItemPassivity<object>>(() =>
@@ -69,17 +76,19 @@ namespace MistCore.Framework.Cached
                     var item = value;
                     var ch = new CacheItemPassivity<object>();
                     ch.Item = item;
-                    ch.SlidingMillisecond = slidingMillisecond;
-                    ch.AbsExpireTime = absoluteTime;
-                    ch.LastTime = DateTime.Now;
+                    ch.SlidingTimeSpan = slidingTimeSpan;
+                    ch.AbsExpireTimeSpan = absoluteTimeSpan;
+                    ch.LastQueryTime = DateTime.Now;
+                    ch.LastMarkTime = DateTime.Now;
                     return ch;
                 }),
                 (key, item) =>
                 {
                     item.Value.Item = value;
-                    item.Value.SlidingMillisecond = slidingMillisecond;
-                    item.Value.AbsExpireTime = absoluteTime;
-                    item.Value.LastTime = DateTime.Now;
+                    item.Value.SlidingTimeSpan = slidingTimeSpan;
+                    item.Value.AbsExpireTimeSpan = absoluteTimeSpan;
+                    item.Value.LastQueryTime = DateTime.Now;
+                    item.Value.LastMarkTime = DateTime.Now;
                     return item;
                 }
             );
@@ -92,40 +101,68 @@ namespace MistCore.Framework.Cached
         /// <typeparam name="T"></typeparam>
         /// <param name="key"></param>
         /// <param name="func"></param>
-        /// <param name="slidingMillisecond"></param>
-        /// <param name="absoluteTime"></param>
-        public T GetOrAdd<T>(string key, Func<string, T> func, int? slidingMillisecond = null, DateTime? absoluteTime = null)
+        /// <param name="slidingTimeSpan"></param>
+        /// <param name="absoluteTimeSpan"></param>
+        public T GetOrAdd<T>(string key, Func<string, T> func, TimeSpan? slidingTimeSpan = null, TimeSpan? absoluteTimeSpan = null)
         {
             var item = ipools.GetOrAdd(key,
                 key => new Lazy<CacheItemPassivity<object>>(() =>
                 {
-                    var item = func(key);
                     var ch = new CacheItemPassivity<object>();
-                    ch.Item = item;
-                    ch.SlidingMillisecond = slidingMillisecond;
-                    ch.AbsExpireTime = absoluteTime;
-                    ch.LastTime = DateTime.Now;
+                    ch.SlidingTimeSpan = slidingTimeSpan;
+                    ch.AbsExpireTimeSpan = absoluteTimeSpan;
+                    ch.LastQueryTime = DateTime.Now;
+                    ch.LastMarkTime = DateTime.Now;
+
+                    for (var i = 0; i < 3; i++)
+                    {
+                        try
+                        {
+                            var item = func(key);
+                            ch.Item = item;
+                            ch.isError = false;
+                            return ch;
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex, $"cache create error {i + 1} times.");
+                        }
+                    }
+                    ch.isError = true;
                     return ch;
                 })
             );
 
-            var upstatus = 0;
             var value = item.Value;
 
-            if (value.SlidingMillisecond != null && (DateTime.Now - value.LastTime).TotalMilliseconds > value.SlidingMillisecond)
+            if (value.isError && value.LastQueryTime > DateTime.Now.AddSeconds(-8))
             {
-                value.SlidingMillisecond = slidingMillisecond;
-                value.AbsExpireTime = absoluteTime;
+                return (T)value.Item;
+            }
+
+            var upstatus = 0;
+            if (value.isError)
+            {
                 upstatus = 2;
             }
-            else if (value.AbsExpireTime != null && DateTime.Now > value.AbsExpireTime)
+            else if (value.SlidingTimeSpan != null && (DateTime.Now - value.LastQueryTime) > value.SlidingTimeSpan)
             {
-                value.SlidingMillisecond = slidingMillisecond;
-                value.AbsExpireTime = absoluteTime;
+                upstatus = 2;
+            }
+            else if (value.AbsExpireTimeSpan != null && (DateTime.Now - value.LastMarkTime) > value.AbsExpireTimeSpan)
+            {
                 upstatus = 2;
             }
 
-            value.LastTime = DateTime.Now;
+            if (value.SlidingTimeSpan != slidingTimeSpan)
+            {
+                value.SlidingTimeSpan = slidingTimeSpan;
+            }
+            if (value.AbsExpireTimeSpan != absoluteTimeSpan)
+            {
+                value.AbsExpireTimeSpan = absoluteTimeSpan;
+            }
+            value.LastQueryTime = DateTime.Now;
 
             if (upstatus == 2)
             {
@@ -137,7 +174,20 @@ namespace MistCore.Framework.Cached
                     {
                         if (item == state.Value.Item)
                         {
-                            state.Value.Item = func(state.Key);
+                            for (var i = 0; i < 3; i++)
+                            {
+                                try
+                                {
+                                    var uitem = func(state.Key);
+                                    state.Value.Item = uitem;
+                                    state.Value.LastMarkTime = DateTime.Now;
+                                    return;
+                                }
+                                catch (Exception ex)
+                                {
+                                    logger.LogError(ex, $"cache update error {i + 1} times.");
+                                }
+                            }
                         }
                     }
                 }, new KeyValuePair<string, CacheItemPassivity<object>>(key, value));
