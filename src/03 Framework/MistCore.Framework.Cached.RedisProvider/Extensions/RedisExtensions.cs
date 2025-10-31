@@ -93,40 +93,43 @@ namespace MistCore.Framework.Cached.RedisProvider
         {
             if (obj == null)
                 return RedisValue.Null;
+
             var type = obj.GetType();
             var underlyingType = Nullable.GetUnderlyingType(type) ?? type;
-            if (underlyingType == typeof(string) ||
-                   underlyingType == typeof(int) || underlyingType == typeof(int?) ||
-                   underlyingType == typeof(long) || underlyingType == typeof(long?) ||
-                   underlyingType == typeof(double) || underlyingType == typeof(double?) ||
-                   underlyingType == typeof(float) || underlyingType == typeof(float?) ||
-                   underlyingType == typeof(decimal) || underlyingType == typeof(decimal?) ||
-                   underlyingType == typeof(uint) || underlyingType == typeof(uint?) ||
-                   underlyingType == typeof(ulong) || underlyingType == typeof(ulong?) ||
-                   underlyingType == typeof(bool) || underlyingType == typeof(bool?) ||
-                   underlyingType == typeof(byte[]) ||
-                   underlyingType == typeof(Memory<byte>) ||
-                   underlyingType == typeof(ReadOnlyMemory<byte>)) // 检查是否支持隐式转换
+
+            // 使用 switch 表达式更清晰
+            return underlyingType switch
             {
-                return (RedisValue)obj;
-            }
-            else if (underlyingType == typeof(short))
-            {
-                return (RedisValue)(int)(short)obj;
-            }
-            else if (underlyingType == typeof(DateTime))
-            {
-                return (RedisValue)((DateTime)obj).ToString("o"); // 使用 ISO 8601 格式
-            }
-            else if (underlyingType.IsPrimitive)
-            {
-                return (RedisValue)obj.ToString();
-            }
-            else
-            {
-                // 不支持隐式转换的类型，需要序列化
-                return (RedisValue)Newtonsoft.Json.JsonConvert.SerializeObject(obj);
-            }
+                Type t when t == typeof(string) => (string)obj,
+                Type t when t == typeof(int) => (int)obj,
+                Type t when t == typeof(int?) => ((int?)obj).GetValueOrDefault(),
+                Type t when t == typeof(long) => (long)obj,
+                Type t when t == typeof(long?) => ((long?)obj).GetValueOrDefault(),
+                Type t when t == typeof(double) => (double)obj,
+                Type t when t == typeof(double?) => ((double?)obj).GetValueOrDefault(),
+                Type t when t == typeof(float) => (float)obj,
+                Type t when t == typeof(float?) => ((float?)obj).GetValueOrDefault(),
+                Type t when t == typeof(decimal) => Convert.ToDouble((decimal)obj), // Redis 不支持 decimal
+                Type t when t == typeof(decimal?) => ((decimal?)obj).HasValue ? Convert.ToDouble(((decimal?)obj).Value) : 0.0,
+                Type t when t == typeof(uint) => (uint)obj,
+                Type t when t == typeof(uint?) => ((uint?)obj).GetValueOrDefault(),
+                Type t when t == typeof(ulong) => (ulong)obj,
+                Type t when t == typeof(ulong?) => ((ulong?)obj).GetValueOrDefault(),
+                Type t when t == typeof(bool) => (bool)obj,
+                Type t when t == typeof(bool?) => ((bool?)obj).GetValueOrDefault(),
+                Type t when t == typeof(byte[]) => (byte[])obj,
+                Type t when t == typeof(Memory<byte>) => ((Memory<byte>)obj).ToArray(),
+                Type t when t == typeof(ReadOnlyMemory<byte>) => ((ReadOnlyMemory<byte>)obj).ToArray(),
+                Type t when t == typeof(short) => (int)(short)obj,
+                Type t when t == typeof(short?) => ((short?)obj).HasValue ? (int)((short?)obj).Value : 0,
+                Type t when t == typeof(DateTime) => ((DateTime)obj).ToString("o"),
+                Type t when t == typeof(DateTime?) => ((DateTime?)obj).HasValue ? ((DateTime?)obj).Value.ToString("o") : string.Empty,
+                Type t when t == typeof(Guid) => ((Guid)obj).ToString(),
+                Type t when t == typeof(Guid?) => ((Guid?)obj).HasValue ? ((Guid?)obj).Value.ToString() : string.Empty,
+                Type t when t.IsEnum => Convert.ToInt32(obj), // 枚举存储为数字
+                Type t when t.IsPrimitive => obj.ToString(), // 其他基本类型
+                _ => Newtonsoft.Json.JsonConvert.SerializeObject(obj) // 复杂类型序列化
+            };
         }
         #endregion
 
