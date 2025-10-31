@@ -599,7 +599,7 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// </summary>
         /// <param name="key"></param>
         /// <returns>当 key 不存在时，返回 nil ，否则，返回 key 的值。如果 key 不是字符串类型，那么返回一个错误</returns>
-        public T Get<T>(string key)
+        public T GET<T>(string key)
         {
             var value = this.database.StringGet(key);
             return value.ToObject<T>();
