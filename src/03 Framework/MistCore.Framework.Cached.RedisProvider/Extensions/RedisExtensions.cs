@@ -140,10 +140,10 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <typeparam name="T"></typeparam>
         /// <param name="hashEntries"></param>
         /// <returns></returns>
-        public static T ToObject<T>(this HashEntry[] hashEntries) where T : new()
+        public static T ToObject<T>(this HashEntry[] hashEntries) where T : class, new()
         {
             if (hashEntries == null || hashEntries.Length == 0)
-                return new T();
+                return null; //new T();
 
             var converter = _hashEntryConverters.GetOrAdd(typeof(T), CreateHashEntryConverterSimple<T>());
             return (T)converter(hashEntries);
@@ -348,67 +348,83 @@ namespace MistCore.Framework.Cached.RedisProvider
 
         private static Expression BuildValueExpression(PropertyInfo prop, MemberExpression propValue)
         {
-
             if (Nullable.GetUnderlyingType(prop.PropertyType) != null)
             {
+                // 可空类型
+                var underlyingType = Nullable.GetUnderlyingType(prop.PropertyType);
+
+                // 对于可空类型，先处理null情况，然后提取实际值递归处理
                 return Expression.Condition(
                     Expression.Equal(propValue, Expression.Constant(null, prop.PropertyType)),
                     Expression.Constant(RedisValue.Null, typeof(RedisValue)),
-                    Expression.Convert(propValue, typeof(RedisValue))
+                    // 对于非null的情况，提取实际值并递归调用BuildValueExpression
+                    BuildValueExpressionForType(underlyingType, Expression.Property(propValue, "Value"))
                 );
             }
-            else if (prop.PropertyType == typeof(string) ||
-                   prop.PropertyType == typeof(int) || prop.PropertyType == typeof(int?) ||
-                   prop.PropertyType == typeof(long) || prop.PropertyType == typeof(long?) ||
-                   prop.PropertyType == typeof(double) || prop.PropertyType == typeof(double?) ||
-                   prop.PropertyType == typeof(float) || prop.PropertyType == typeof(float?) ||
-                   prop.PropertyType == typeof(decimal) || prop.PropertyType == typeof(decimal?) ||
-                   prop.PropertyType == typeof(uint) || prop.PropertyType == typeof(uint?) ||
-                   prop.PropertyType == typeof(ulong) || prop.PropertyType == typeof(ulong?) ||
-                   prop.PropertyType == typeof(bool) || prop.PropertyType == typeof(bool?) ||
-                   prop.PropertyType == typeof(byte[]) ||
-                   prop.PropertyType == typeof(Memory<byte>) ||
-                   prop.PropertyType == typeof(ReadOnlyMemory<byte>)) // 检查是否支持隐式转换
+            else if(!prop.PropertyType.IsValueType)
             {
-                Expression valueExpr = Expression.Convert(propValue, typeof(RedisValue));
-
-                if (!prop.PropertyType.IsValueType)
-                {
-                    valueExpr = Expression.Condition(
-                        Expression.Equal(propValue, Expression.Constant(null, prop.PropertyType)),
-                        Expression.Constant(RedisValue.Null, typeof(RedisValue)),
-                        valueExpr
-                    );
-                }
-                return valueExpr;
-            }
-            else if (prop.PropertyType == typeof(short))
-            {
-                return Expression.Convert(Expression.Convert(propValue, typeof(int)), typeof(RedisValue));
-            }
-            else if (prop.PropertyType == typeof(DateTime))
-            {
-                return Expression.Convert(Expression.Call(propValue, "ToString", null, null), typeof(RedisValue));
-            }
-            else if (prop.PropertyType.IsPrimitive)
-            {
-                return Expression.Convert(Expression.Call(propValue, "ToString", null, null), typeof(RedisValue));
+                // 引用类型，先检查null
+                return Expression.Condition(
+                    Expression.Equal(propValue, Expression.Constant(null, prop.PropertyType)),
+                    Expression.Constant(RedisValue.Null, typeof(RedisValue)),
+                    BuildValueExpressionForType(prop.PropertyType, propValue)
+                );
             }
             else
             {
-                // 不支持隐式转换的类型，需要序列化
+                // 值类型，直接处理
+                return BuildValueExpressionForType(prop.PropertyType, propValue);
+            }
+        }
+
+        private static Expression BuildValueExpressionForType(Type propertyType, Expression valueExpression)
+        {
+            if (propertyType == typeof(string) ||
+                propertyType == typeof(int) ||
+                propertyType == typeof(long) ||
+                propertyType == typeof(double) ||
+                propertyType == typeof(float) ||
+                propertyType == typeof(decimal) ||
+                propertyType == typeof(uint) ||
+                propertyType == typeof(ulong) ||
+                propertyType == typeof(bool) ||
+                propertyType == typeof(byte[]) ||
+                propertyType == typeof(Memory<byte>) ||
+                propertyType == typeof(ReadOnlyMemory<byte>))
+            {
+                // 这些类型支持直接转换为 RedisValue
+                return Expression.Convert(valueExpression, typeof(RedisValue));
+            }
+            else if (propertyType == typeof(short))
+            {
+                // short 需要先转换为 int
+                return Expression.Convert(Expression.Convert(valueExpression, typeof(int)), typeof(RedisValue));
+            }
+            else if (propertyType == typeof(DateTime))
+            {
+                // DateTime 转换为字符串, ISO 8601 格式
+                return Expression.Convert(Expression.Call(valueExpression, "ToString", null, Expression.Constant("O")), typeof(RedisValue));
+            }
+            else if (propertyType == typeof(Guid))
+            {
+                // Guid 转换为字符串
+                return Expression.Convert(Expression.Call(valueExpression, "ToString", null), typeof(RedisValue));
+            }
+            else if (propertyType.IsPrimitive)
+            {
+                // 其他基本类型转换为字符串
+                return Expression.Convert(Expression.Call(valueExpression, "ToString", null), typeof(RedisValue));
+            }
+            else
+            {
+                // 不支持的类型需要序列化
                 var serializeMethod = typeof(Newtonsoft.Json.JsonConvert).GetMethod("SerializeObject",
                     new[] { typeof(object) });
 
-                return Expression.Condition(
-                    Expression.Equal(propValue, Expression.Constant(null, prop.PropertyType)),
-                    Expression.Constant(RedisValue.Null, typeof(RedisValue)),
-                    Expression.Convert(
-                        Expression.Call(null, serializeMethod,
-                            Expression.Convert(propValue, typeof(object))),
-                        typeof(RedisValue)
-                    )
-                );
+                return Expression.Convert(
+                    Expression.Call(null, serializeMethod,
+                        Expression.Convert(valueExpression, typeof(object))),
+                    typeof(RedisValue));
             }
         }
 

@@ -81,7 +81,7 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="seconds"></param>
         /// <returns>设置成功时返回 1，当 key 不存时则返回 0</returns>
-        public async Task<bool> EXPIREAsync(string key, int seconds)
+        public async Task<bool> EXPIREAsync(string key, double seconds)
         {
             return await this.database.KeyExpireAsync(key, TimeSpan.FromSeconds(seconds));
         }
@@ -105,7 +105,7 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="milliseconds"></param>
         /// <returns>设置成功时返回 1，当 key 不存时则返回 0</returns>
-        public async Task<bool> PEXPIREAsync(string key, int milliseconds)
+        public async Task<bool> PEXPIREAsync(string key, double milliseconds)
         {
             return  await this.database.KeyExpireAsync(key, TimeSpan.FromMilliseconds(milliseconds));
         }
@@ -117,7 +117,7 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="millisecondsTimestamp"></param>
         /// <returns></returns>
-        public async Task<bool> PEXPIREATAsync(string key, long millisecondsTimestamp)
+        public async Task<bool> PEXPIREATAsync(string key, double millisecondsTimestamp)
         {
             return await this.database.KeyExpireAsync(key, new DateTime(1970, 1, 1).AddMilliseconds(millisecondsTimestamp));
         }
@@ -225,6 +225,55 @@ namespace MistCore.Framework.Cached.RedisProvider
 
         #endregion
 
+        #region Lock
+        /// <summary>
+        /// LOCK 加锁
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="expiry"></param>
+        /// <returns></returns>
+        public async Task<bool> LOCKAsync<T>(string key, T value, TimeSpan expiry)
+        {
+            return await this.database.LockTakeAsync(key, RedisExtensions.ToRedisValue(value), expiry);
+        }
+
+        /// <summary>
+        /// LOCK QUERY 查询锁
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public async Task<T> LOCKQUERYAsync<T>(string key)
+        {
+            return (await this.database.LockQueryAsync(key)).ToObject<T>();
+        }
+
+        /// <summary>
+        /// LOCKEXTEND 延长锁时
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="expiry"></param>
+        /// <returns></returns>
+        public async Task<bool> LOCKEXTENDAsync<T>(string key, T value, TimeSpan expiry)
+        {
+            return await this.database.LockExtendAsync(key, RedisExtensions.ToRedisValue(value), expiry);
+        }
+
+        /// <summary>
+        /// LOCKRELEASE 释放锁
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public async Task<bool> LOCKRELEASEAsync(string key, string value)
+        {
+            return await this.database.LockReleaseAsync(key, value);
+        }
+        #endregion
+
         #region Exec
 
         /// <summary>
@@ -239,6 +288,29 @@ namespace MistCore.Framework.Cached.RedisProvider
             func(transaction);
 
             await transaction.ExecuteAsync();
+        }
+
+        /// <summary>
+        /// Exec
+        /// 执行复杂指令
+        /// </summary>
+        /// <param name="func"></param>
+        /// <returns></returns>
+        public async Task ExecAsync(Func<IDatabase, Task> func)
+        {
+            await func(this.database);
+        }
+
+        /// <summary>
+        /// Exec
+        /// 执行复杂指令
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="func"></param>
+        /// <returns></returns>
+        public async Task<T> ExecAsync<T>(Func<IDatabase, Task<T>> func)
+        {
+            return await func(this.database);
         }
 
         #endregion
@@ -349,10 +421,23 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="field"></param>
         /// <param name="value"></param>
+        /// <param name="when"></param>
         /// <returns>如果 field 是哈希表中的一个新字段，并且值设置成功，则返回 1；如果哈希表中 field 已经存在，并且旧值已被新值覆盖，则返回 0</returns>
-        public async Task<long> HSETAsync<T>(string key, string field, T value)
+        public async Task<long> HSETAsync<T>(string key, string field, T value, When when = When.Always)
         {
-            return await this.database.HashSetAsync(key, field, RedisExtensions.ToRedisValue(value)) ? 1 : 0;
+            return await this.database.HashSetAsync(key, field, RedisExtensions.ToRedisValue(value), when) ? 1 : 0;
+        }
+
+        /// <summary>
+        /// HSET key field value, field1 value1...
+        /// 同时将多个 field-value (字段-值)对设置到哈希表 key 中
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="pairs"></param>
+        public async Task HSETAsync(string key, params KeyValuePair<string, object>[] pairs)
+        {
+            var hashFields = pairs.Select(c => new HashEntry(c.Key, RedisExtensions.ToRedisValue(c.Value))).ToArray();
+            await this.database.HashSetAsync(key, hashFields);
         }
 
         /// <summary>
@@ -361,10 +446,27 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
+        /// <param name="removeNullFields">是否删除值为null的字段（true：删除，false：忽略）</param>
         /// <returns></returns>
-        public async Task HSETAsync<T>(string key, T value) where T : class, new()
+        public async Task HSETAsync<T>(string key, T value, bool removeNullFields = false) where T : class, new()
         {
-            await this.database.HashSetAsync(key, RedisExtensions.ToHashEntries(value));
+            var hashFields = RedisExtensions.ToHashEntries(value);
+
+            var updateHashFields = hashFields.Where(c => c.Value != RedisValue.Null).ToArray();
+            if (updateHashFields.Length > 0)
+            {
+                await this.database.HashSetAsync(key, updateHashFields);
+            }
+
+            if (removeNullFields)
+            {
+                var deleteHashFields = hashFields.Where(c => c.Value == RedisValue.Null).Select(c => c.Name).ToArray();
+
+                if (deleteHashFields.Length > 0)
+                {
+                    await this.database.HashDeleteAsync(key, deleteHashFields);
+                }
+            }
         }
 
         /// <summary>
@@ -491,6 +593,18 @@ namespace MistCore.Framework.Cached.RedisProvider
         }
 
         /// <summary>
+        /// GET key
+        /// 返回 key 所关联的字符串值
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns>当 key 不存在时，返回 nil ，否则，返回 key 的值。如果 key 不是字符串类型，那么返回一个错误</returns>
+        public async Task<T> GETAsync<T>(string key)
+        {
+            var value = await this.database.StringGetAsync(key);
+            return value.ToObject<T>();
+        }
+
+        /// <summary>
         /// GETBIT key offset
         /// 对 key 所储存的字符串值，获取指定偏移量上的位(bit)
         /// </summary>
@@ -538,7 +652,22 @@ namespace MistCore.Framework.Cached.RedisProvider
             var values = await this.database.StringGetAsync(keys.Select(c => (RedisKey)c).ToArray());
             foreach (var value in values)
             {
-                yield return value.ToObject<string>();
+                yield return value;
+            }
+        }
+
+        /// <summary>
+        /// MGET key [key ...]
+        /// 返回所有(一个或多个)给定 key 的值
+        /// </summary>
+        /// <param name="keys"></param>
+        /// <returns>返回所有 key 存储的 value 值</returns>
+        public async IAsyncEnumerable<T> MGETAsync<T>(params string[] keys)
+        {
+            var values = await this.database.StringGetAsync(keys.Select(c => (RedisKey)c).ToArray());
+            foreach (var value in values)
+            {
+                yield return value.ToObject<T>();
             }
         }
 
@@ -576,9 +705,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="expiry"></param>
         /// <param name="when"></param>
         /// <returns>返回OK</returns>
-        public async Task<bool> SETAsync(string key, string value, TimeSpan? expiry = null, When when = When.Always)
+        public async Task<bool> SETAsync<T>(string key, T value, TimeSpan? expiry = null, When when = When.Always)
         {
-            return await this.database.StringSetAsync(key, value, expiry, when: When.Always);
+            return await this.database.StringSetAsync(key, RedisExtensions.ToRedisValue(value), expiry, when: When.Always);
         }
 
         /// <summary>
@@ -589,9 +718,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="value"></param>
         /// <param name="expiry"></param>
         /// <returns>设置成功，返回 1；设置失败，返回 0</returns>
-        public async Task<bool> SETNXAsync(string key, string value, TimeSpan? expiry = null)
+        public async Task<bool> SETNXAsync<T>(string key, T value, TimeSpan? expiry = null)
         {
-            return await this.database.StringSetAsync(key, value, expiry, when: When.NotExists);
+            return await this.database.StringSetAsync(key, RedisExtensions.ToRedisValue(value), expiry, when: When.NotExists);
         }
 
         /// <summary>
@@ -603,9 +732,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="seconds"></param>
         /// <param name="when"></param>
         /// <returns>设置成功时返回 OK，若 second 参数不符合要求，则会返回一个错误，比如设置成了负数或者浮点数</returns>
-        public async Task<bool> SETEXAsync(string key, string value, int seconds, When when = When.Always)
+        public async Task<bool> SETEXAsync<T>(string key, T value, int seconds, When when = When.Always)
         {
-            return await this.database.StringSetAsync(key, value, TimeSpan.FromSeconds(seconds), when: when);
+            return await this.database.StringSetAsync(key, RedisExtensions.ToRedisValue(value), TimeSpan.FromSeconds(seconds), when: when);
         }
 
         /// <summary>

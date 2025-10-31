@@ -85,7 +85,7 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="seconds"></param>
         /// <returns>设置成功时返回 1，当 key 不存时则返回 0</returns>
-        public bool EXPIRE(string key, int seconds)
+        public bool EXPIRE(string key, double seconds)
         {
             return this.database.KeyExpire(key, TimeSpan.FromSeconds(seconds));
         }
@@ -109,7 +109,7 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="milliseconds"></param>
         /// <returns>设置成功时返回 1，当 key 不存时则返回 0</returns>
-        public bool PEXPIRE(string key, int milliseconds)
+        public bool PEXPIRE(string key, double milliseconds)
         {
             return this.database.KeyExpire(key, TimeSpan.FromMilliseconds(milliseconds));
         }
@@ -121,7 +121,7 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="millisecondsTimestamp"></param>
         /// <returns></returns>
-        public bool PEXPIREAT(string key, long millisecondsTimestamp)
+        public bool PEXPIREAT(string key, double millisecondsTimestamp)
         {
             return this.database.KeyExpire(key, new DateTime(1970, 1, 1).AddMilliseconds(millisecondsTimestamp));
         }
@@ -229,6 +229,55 @@ namespace MistCore.Framework.Cached.RedisProvider
 
         #endregion
 
+        #region Lock
+        /// <summary>
+        /// LOCK 加锁
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="expiry"></param>
+        /// <returns></returns>
+        public bool LOCK<T>(string key, T value, TimeSpan expiry)
+        {
+            return this.database.LockTake(key, RedisExtensions.ToRedisValue(value), expiry);
+        }
+
+        /// <summary>
+        /// LOCK QUERY 查询锁
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public T LOCKQUERY<T>(string key)
+        {
+            return this.database.LockQuery(key).ToObject<T>();
+        }
+
+        /// <summary>
+        /// LOCKEXTEND 延长锁时
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <param name="expiry"></param>
+        /// <returns></returns>
+        public bool LOCKEXTEND<T>(string key, T value, TimeSpan expiry)
+        {
+            return this.database.LockExtend(key, RedisExtensions.ToRedisValue(value), expiry);
+        }
+
+        /// <summary>
+        /// LOCKRELEASE 释放锁
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="value"></param>
+        /// <returns></returns>
+        public bool LOCKRELEASE(string key, string value)
+        {
+            return this.database.LockRelease(key, value);
+        }
+        #endregion
+
         #region Exec
 
         /// <summary>
@@ -247,13 +296,24 @@ namespace MistCore.Framework.Cached.RedisProvider
 
         /// <summary>
         /// Exec
-        /// 执行命令
+        /// 执行复杂指令
         /// </summary>
         /// <param name="func"></param>
         public void Exec(Action<IDatabase> func)
         {
             func(this.database);
         }
+
+        /// <summary>
+        /// Exec
+        /// 执行复杂指令
+        /// </summary>
+        /// <param name="func"></param>
+        public T Exec<T>(Func<IDatabase, T> func)
+        {
+            return func(this.database);
+        }
+
         #endregion
 
         #region Hash
@@ -362,10 +422,23 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="key"></param>
         /// <param name="field"></param>
         /// <param name="value"></param>
+        /// <param name="when"></param>
         /// <returns>如果 field 是哈希表中的一个新字段，并且值设置成功，则返回 1；如果哈希表中 field 已经存在，并且旧值已被新值覆盖，则返回 0</returns>
-        public long HSET<T>(string key, string field, T value)
+        public long HSET<T>(string key, string field, T value, When when = When.Always)
         {
-            return this.database.HashSet(key, field, RedisExtensions.ToRedisValue(value)) ? 1 : 0;
+            return this.database.HashSet(key, field, RedisExtensions.ToRedisValue(value), when) ? 1 : 0;
+        }
+
+        /// <summary>
+        /// HSET key field value, field1 value1...
+        /// 同时将多个 field-value (字段-值)对设置到哈希表 key 中
+        /// </summary>
+        /// <param name="key"></param>
+        /// <param name="pairs"></param>
+        public void HSET(string key, params KeyValuePair<string, object>[] pairs)
+        {
+            var hashFields = pairs.Select(c => new HashEntry(c.Key, RedisExtensions.ToRedisValue(c.Value))).ToArray();
+            this.database.HashSet(key, hashFields);
         }
 
         /// <summary>
@@ -374,10 +447,27 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// </summary>
         /// <param name="key"></param>
         /// <param name="value"></param>
+        /// <param name="removeNullFields">是否删除值为null的字段（true：删除，false：忽略）</param>
         /// <returns></returns>
-        public void HSET<T>(string key, T value) where T: class, new()
+        public void HSET<T>(string key, T value, bool removeNullFields = false) where T: class, new()
         {
-            this.database.HashSet(key, RedisExtensions.ToHashEntries(value));
+            var hashFields = RedisExtensions.ToHashEntries(value);
+
+            var updateHashFields = hashFields.Where(c=>c.Value != RedisValue.Null).ToArray();
+            if (updateHashFields.Length > 0)
+            {
+                this.database.HashSet(key, updateHashFields);
+            }
+
+            if (removeNullFields)
+            {
+                var deleteHashFields = hashFields.Where(c => c.Value == RedisValue.Null).Select(c => c.Name).ToArray();
+
+                if (deleteHashFields.Length > 0)
+                {
+                    this.database.HashDelete(key, deleteHashFields);
+                }
+            }
         }
 
         /// <summary>
@@ -504,6 +594,18 @@ namespace MistCore.Framework.Cached.RedisProvider
         }
 
         /// <summary>
+        /// GET key
+        /// 返回 key 所关联的字符串值
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns>当 key 不存在时，返回 nil ，否则，返回 key 的值。如果 key 不是字符串类型，那么返回一个错误</returns>
+        public T Get<T>(string key)
+        {
+            var value = this.database.StringGet(key);
+            return value.ToObject<T>();
+        }
+
+        /// <summary>
         /// GETBIT key offset
         /// 对 key 所储存的字符串值，获取指定偏移量上的位(bit)
         /// </summary>
@@ -549,9 +651,24 @@ namespace MistCore.Framework.Cached.RedisProvider
         public IEnumerable<string> MGET(params string[] keys)
         {
             var values = this.database.StringGet(keys.Select(c => (RedisKey)c).ToArray());
+            foreach (var value in values)
+            {
+                yield return value;
+            }
+        }
+
+        /// <summary>
+        /// MGET key [key ...]
+        /// 返回所有(一个或多个)给定 key 的值
+        /// </summary>
+        /// <param name="keys"></param>
+        /// <returns>返回所有 key 存储的 value 值</returns>
+        public IEnumerable<T> MGET<T>(params string[] keys)
+        {
+            var values = this.database.StringGet(keys.Select(c => (RedisKey)c).ToArray());
             foreach(var value in values)
             {
-                yield return value.ToObject<string>();
+                yield return value.ToObject<T>();
             }
         }
 
@@ -589,9 +706,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="expiry"></param>
         /// <param name="when"></param>
         /// <returns>返回OK</returns>
-        public bool SET(string key, string value, TimeSpan? expiry = null, When when = When.Always)
+        public bool SET<T>(string key, T value, TimeSpan? expiry = null, When when = When.Always)
         {
-            return this.database.StringSet(key, value, expiry, when: When.Always);
+            return this.database.StringSet(key, RedisExtensions.ToRedisValue(value), expiry, when: When.Always);
         }
 
         /// <summary>
@@ -602,9 +719,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="value"></param>
         /// <param name="expiry"></param>
         /// <returns>设置成功，返回 1；设置失败，返回 0</returns>
-        public bool SETNX(string key, string value, TimeSpan? expiry = null)
+        public bool SETNX<T>(string key, T value, TimeSpan? expiry = null)
         {
-            return this.database.StringSet(key, value, expiry, when: When.NotExists);
+            return this.database.StringSet(key, RedisExtensions.ToRedisValue(value), expiry, when: When.NotExists);
         }
 
         /// <summary>
@@ -616,9 +733,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <param name="seconds"></param>
         /// <param name="when"></param>
         /// <returns>设置成功时返回 OK，若 second 参数不符合要求，则会返回一个错误，比如设置成了负数或者浮点数</returns>
-        public bool SETEX(string key, string value, int seconds, When when = When.Always)
+        public bool SETEX<T>(string key, T value, int seconds, When when = When.Always)
         {
-            return this.database.StringSet(key, value, TimeSpan.FromSeconds(seconds), when: when);
+            return this.database.StringSet(key, RedisExtensions.ToRedisValue(value), TimeSpan.FromSeconds(seconds), when: when);
         }
 
         /// <summary>
