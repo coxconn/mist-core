@@ -100,9 +100,9 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <typeparam name="T"></typeparam>
         /// <param name="key"></param>
         /// <param name="value"></param>
-        /// <param name="slidingMillisecond"></param>
-        /// <param name="absoluteTime"></param>
-        public void Set<T>(string key, T value, int? slidingMillisecond = null, DateTime? absoluteTime = null)
+        /// <param name="slidingTimeSpan"></param>
+        /// <param name="absoluteTimeSpan"></param>
+        public void Set<T>(string key, T value, TimeSpan? slidingTimeSpan = null, TimeSpan? absoluteTimeSpan = null)
         {
             var json = (value is string) ? Convert.ToString(value) : JsonConvert.SerializeObject(value, new JsonSerializerSettings
             {
@@ -112,14 +112,14 @@ namespace MistCore.Framework.Cached.RedisProvider
             var buffer = Encoding.UTF8.GetBytes(json);
 
             var options = new DistributedCacheEntryOptions();
-            if (slidingMillisecond != null)
+            if (slidingTimeSpan != null)
             {
-                options.SetSlidingExpiration(TimeSpan.FromMilliseconds(slidingMillisecond.Value));
+                options.SetSlidingExpiration(slidingTimeSpan.Value);
                 cache.Set(key, buffer, options);
             }
-            else if(absoluteTime != null)
+            else if (absoluteTimeSpan != null)
             {
-                options.SetAbsoluteExpiration(absoluteTime.Value);
+                options.SetAbsoluteExpiration(absoluteTimeSpan.Value);
                 cache.Set(key, buffer, options);
             }
             else
@@ -137,11 +137,10 @@ namespace MistCore.Framework.Cached.RedisProvider
         /// <typeparam name="T"></typeparam>
         /// <param name="key"></param>
         /// <param name="func"></param>
-        /// <param name="slidingMillisecond"></param>
-        /// <param name="absoluteTime"></param>
+        /// <param name="slidingTimeSpan"></param>
+        /// <param name="absoluteTimeSpan"></param>
         /// <returns></returns>
-        /// <exception cref="NotImplementedException"></exception>
-        public T GetOrAdd<T>(string key, Func<string, T> func, int? slidingMillisecond = null, DateTime? absoluteTime = null)
+        public T GetOrAdd<T>(string key, Func<string, T> func, TimeSpan? slidingTimeSpan = null, TimeSpan? absoluteTimeSpan = null)
         {
             var item = this.Get<T>(key);
 
@@ -152,7 +151,7 @@ namespace MistCore.Framework.Cached.RedisProvider
             else
             {
                 var value = func(key);
-                this.Set<T>(key, value, slidingMillisecond, absoluteTime);
+                this.Set<T>(key, value, slidingTimeSpan, absoluteTimeSpan);
                 return value;
             }
         }
