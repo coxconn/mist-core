@@ -7,7 +7,7 @@
     <Description>Mist framework</Description>
 	<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<PackageIcon>nuget-logo.png</PackageIcon>
-	<Version>1.0.3</Version>
+	<Version>1.0.4</Version>
 	<Authors>John Hsu</Authors>
   </PropertyGroup>
 

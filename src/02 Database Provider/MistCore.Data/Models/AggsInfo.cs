@@ -1,17 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace MistCore.Data
 {
-
+    [DataContract(Namespace = "http://tempuri.org/")]
     public class AggsInfo
     {
+        [DataMember(Name = "key")]
         public string Key { get; set; }
+
+        [DataMember(Name = "name")]
         public string Name { get; set; }
+
+        [DataMember(Name = "child")]
         public List<AggsInfo> Child { get; set; }
+
+        [DataMember(Name = "count")]
         public int Count { get; set; }
+
+        [DataMember(Name = "detail")]
         public object Detail { get; set; }
 
         public AggsInfo() { }

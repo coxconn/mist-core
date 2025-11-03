@@ -1,15 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 using System.Text;
 
 namespace MistCore.Data
 {
-
     [Serializable]
+    [DataContract(Namespace = "http://tempuri.org/")]
     public class ApiResult<T>
     {
+        [DataMember(Name = "code")]
         public virtual int Code { get; set; }
+
+        [DataMember(Name = "message")]
         public virtual string Message { get; set; }
+
+        [DataMember(Name = "data")]
         public virtual T Data { get; set; }
 
         public ApiResult()
