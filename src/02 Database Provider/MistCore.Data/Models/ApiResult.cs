@@ -6,12 +6,16 @@ using System.Text;
 namespace MistCore.Data
 {
     [Serializable]
+    [DataContract(Namespace = "http://tempuri.org/")]
     public class ApiResult<T>
     {
+        [DataMember(Name = "Code")]
         public virtual int Code { get; set; }
 
+        [DataMember(Name = "Message")]
         public virtual string Message { get; set; }
 
+        [DataMember(Name = "Data")]
         public virtual T Data { get; set; }
 
         public ApiResult()
@@ -33,10 +37,16 @@ namespace MistCore.Data
     }
 
     [Serializable]
+    [DataContract(Namespace = "http://tempuri.org/")]
     public class ApiResult
     {
+        [DataMember(Name = "Code")]
         public virtual int Code { get; set; }
+
+        [DataMember(Name = "Message")]
         public virtual string Message { get; set; }
+
+        [DataMember(Name = "Data")]
         public virtual object Data { get; set; }
 
         public ApiResult()
@@ -58,10 +68,16 @@ namespace MistCore.Data
     }
 
     [Serializable]
+    [DataContract(Namespace = "http://tempuri.org/")]
     public class ResultInfo<T>
     {
+        [DataMember(Name = "Detail")]
         public virtual T Detail { get; set; }
+
+        [DataMember(Name = "List")]
         public virtual List<T> List { get; set; }
+
+        [DataMember(Name = "Page")]
         public PageInfo Page { get; set; }
 
         public ResultInfo()
@@ -81,10 +97,16 @@ namespace MistCore.Data
     }
 
     [Serializable]
+    [DataContract(Namespace = "http://tempuri.org/")]
     public class ResultInfo
     {
+        [DataMember(Name = "Detail")]
         public virtual object Detail { get; set; }
+
+        [DataMember(Name = "List")]
         public virtual object List { get; set; }
+
+        [DataMember(Name = "Page")]
         public PageInfo Page { get; set; }
 
         public ResultInfo()
@@ -111,10 +133,16 @@ namespace MistCore.Data
     }
 
     [Serializable]
+    [DataContract(Namespace = "http://tempuri.org/")]
     public class ResultInfo<T, E>
     {
+        [DataMember(Name = "Detail")]
         public virtual E Detail { get; set; }
+
+        [DataMember(Name = "List")]
         public virtual List<T> List { get; set; }
+
+        [DataMember(Name = "Page")]
         public PageInfo Page { get; set; }
 
         public ResultInfo()

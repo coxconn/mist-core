@@ -6,16 +6,22 @@ using System.Text;
 
 namespace MistCore.Data
 {
+    [DataContract(Namespace = "http://tempuri.org/")]
     public class AggsInfo
     {
+        [DataMember(Name = "Key")]
         public string Key { get; set; }
 
+        [DataMember(Name = "Name")]
         public string Name { get; set; }
 
+        [DataMember(Name = "Child")]
         public List<AggsInfo> Child { get; set; }
 
+        [DataMember(Name = "Count")]
         public int Count { get; set; }
 
+        [DataMember(Name = "Detail")]
         public object Detail { get; set; }
 
         public AggsInfo() { }
