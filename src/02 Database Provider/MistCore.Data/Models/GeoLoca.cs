@@ -6,7 +6,6 @@ using System.Text;
 
 namespace MistCore.Data
 {
-    [DataContract(Namespace = "http://tempuri.org/")]
     public class GeoLoca
     {
         public GeoLoca() { }
@@ -30,10 +29,8 @@ namespace MistCore.Data
             }
         }
 
-        [DataMember(Name = "lat")]
         public double Lat { get; set; }
 
-        [DataMember(Name = "lon")]
         public double Lon { get; set; }
 
     }

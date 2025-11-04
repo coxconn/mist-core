@@ -6,16 +6,12 @@ using System.Text;
 namespace MistCore.Data
 {
     [Serializable]
-    [DataContract(Namespace = "http://tempuri.org/")]
     public class ApiResult<T>
     {
-        [DataMember(Name = "code")]
         public virtual int Code { get; set; }
 
-        [DataMember(Name = "message")]
         public virtual string Message { get; set; }
 
-        [DataMember(Name = "data")]
         public virtual T Data { get; set; }
 
         public ApiResult()
@@ -64,7 +60,7 @@ namespace MistCore.Data
     [Serializable]
     public class ResultInfo<T>
     {
-        public virtual T detail { get; set; }
+        public virtual T Detail { get; set; }
         public virtual List<T> List { get; set; }
         public PageInfo Page { get; set; }
 
@@ -74,7 +70,7 @@ namespace MistCore.Data
 
         public ResultInfo(T detail)
         {
-            this.detail = detail;
+            this.Detail = detail;
         }
 
         public ResultInfo(List<T> list, PageInfo page)
